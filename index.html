@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Life Optimiser — Michael Webster</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -42,7 +43,8 @@
   .card { background:var(--white); border-radius:18px; padding:20px; box-shadow:var(--shadow); overflow:hidden; }
   .card:hover { box-shadow:var(--shadow-md); }
   .card-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
-  .card-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+  .card-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .card-icon svg { width:18px; height:18px; stroke-width:2; }
   .card-title { font-size:0.78rem; font-weight:700; color:var(--text); }
   .card-subtitle { font-size:0.65rem; color:var(--text-dim); font-weight:500; }
   .card-wide { grid-column:1/-1; }
@@ -118,7 +120,8 @@
   .w-day { min-width:76px; padding:10px 8px; border-radius:12px; text-align:center; background:var(--bg); flex-shrink:0; }
   .w-day.today { background:var(--blue-bg); border:1.5px solid rgba(59,130,246,0.2); }
   .w-day .w-label { font-size:0.6rem; font-weight:600; color:var(--text-dim); }
-  .w-day .w-icon { font-size:1.3rem; margin:4px 0; }
+  .w-day .w-icon { margin:4px 0; display:flex; align-items:center; justify-content:center; }
+  .w-day .w-icon svg { width:22px; height:22px; stroke-width:1.8; color:var(--text-secondary); }
   .w-day .w-temps { font-size:0.7rem; }
   .w-day .w-hi { font-weight:700; }
   .w-day .w-lo { color:var(--text-dim); }
@@ -306,12 +309,12 @@ const DATA = {
     targets: { calories:"~2,200", protein:"130g+", focus:"Travel nutrition + pre-run fuel" }
   },
   weather: [
-    { day:"Thu", icon:"🌧️", hi:10, lo:3, rain:100 },
-    { day:"Fri", icon:"🌧️", hi:14, lo:8, rain:78 },
-    { day:"Today", icon:"🌧️", hi:13, lo:6, rain:100, isToday:true },
-    { day:"Sun", icon:"🌧️", hi:9, lo:4, rain:87 },
-    { day:"Mon", icon:"☁️", hi:13, lo:7, rain:0 },
-    { day:"Tue", icon:"🌧️", hi:13, lo:10, rain:67 }
+    { day:"Thu", icon:"cloud-rain", hi:10, lo:3, rain:100 },
+    { day:"Fri", icon:"cloud-rain", hi:14, lo:8, rain:78 },
+    { day:"Today", icon:"cloud-rain", hi:13, lo:6, rain:100, isToday:true },
+    { day:"Sun", icon:"cloud-rain", hi:9, lo:4, rain:87 },
+    { day:"Mon", icon:"cloud", hi:13, lo:7, rain:0 },
+    { day:"Tue", icon:"cloud-rain", hi:13, lo:10, rain:67 }
   ]
 };
 // ===== END DATA BLOCK =====
@@ -348,7 +351,7 @@ function render() {
   <!-- 7-DAY AVERAGES -->
   <div class="card card-wide">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--blue-bg)"><span style="color:var(--blue)">📊</span></div>
+      <div class="card-icon" style="background:var(--blue-bg)"><i data-lucide="bar-chart-3" style="color:var(--blue)"></i></div>
       <div><div class="card-title">7-Day Averages</div><div class="card-subtitle">Mar 29 – Apr 4</div></div>
     </div>
     <div class="stat-pills">
@@ -364,7 +367,7 @@ function render() {
   <!-- SLEEP TRENDS -->
   <div class="card card-2col">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--blue-bg)"><span style="color:var(--blue)">🌙</span></div>
+      <div class="card-icon" style="background:var(--blue-bg)"><i data-lucide="moon" style="color:var(--blue)"></i></div>
       <div><div class="card-title">Sleep</div><div class="card-subtitle">Score & duration over 7 nights</div></div>
     </div>
     <div class="chart-wrap"><canvas id="sleepChart" height="180"></canvas></div>
@@ -373,7 +376,7 @@ function render() {
   <!-- BODY BATTERY RANGE -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--green-bg)"><span style="color:var(--green)">🔋</span></div>
+      <div class="card-icon" style="background:var(--green-bg)"><i data-lucide="zap" style="color:var(--green)"></i></div>
       <div><div class="card-title">Body Battery</div><div class="card-subtitle">Daily high → low range</div></div>
     </div>
     <div class="chart-wrap"><canvas id="bbChart" height="180"></canvas></div>
@@ -382,7 +385,7 @@ function render() {
   <!-- HRV + STRESS + RHR -->
   <div class="card card-2col">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--teal-bg)"><span style="color:var(--teal)">💓</span></div>
+      <div class="card-icon" style="background:var(--teal-bg)"><i data-lucide="heart-pulse" style="color:var(--teal)"></i></div>
       <div><div class="card-title">HRV, Stress & Resting HR</div><div class="card-subtitle">7-day trends</div></div>
     </div>
     <div class="chart-wrap"><canvas id="hrvChart" height="170"></canvas></div>
@@ -391,7 +394,7 @@ function render() {
   <!-- STEPS -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--orange-bg)"><span style="color:var(--orange)">👟</span></div>
+      <div class="card-icon" style="background:var(--orange-bg)"><i data-lucide="footprints" style="color:var(--orange)"></i></div>
       <div><div class="card-title">Daily Steps</div><div class="card-subtitle">vs adaptive goal</div></div>
     </div>
     <div class="chart-wrap"><canvas id="stepsChart" height="180"></canvas></div>
@@ -400,7 +403,7 @@ function render() {
   <!-- RUNNING & RACE PREDICTIONS -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--green-bg)"><span style="color:var(--green)">🏃</span></div>
+      <div class="card-icon" style="background:var(--green-bg)"><i data-lucide="timer" style="color:var(--green)"></i></div>
       <div><div class="card-title">Running Goals</div><div class="card-subtitle">PR vs Garmin prediction</div></div>
     </div>
     <div class="goal-item">
@@ -429,7 +432,7 @@ function render() {
   <!-- TRAINING LOG -->
   <div class="card card-2col">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--orange-bg)"><span style="color:var(--orange)">📋</span></div>
+      <div class="card-icon" style="background:var(--orange-bg)"><i data-lucide="clipboard-list" style="color:var(--orange)"></i></div>
       <div><div class="card-title">Training Log</div><div class="card-subtitle">Activities this week</div></div>
     </div>
     <table class="act-table">
@@ -450,7 +453,7 @@ function render() {
   <!-- TRAINING PLAN -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--green-bg)"><span style="color:var(--green)">📝</span></div>
+      <div class="card-icon" style="background:var(--green-bg)"><i data-lucide="notebook-pen" style="color:var(--green)"></i></div>
       <div><div class="card-title">Training Plan</div><div class="card-subtitle">Next 3 days</div></div>
     </div>
     ${D.trainingPlan.map(tp=>`
@@ -470,7 +473,7 @@ function render() {
   <!-- THESIS -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--purple-bg)"><span style="color:var(--purple)">📚</span></div>
+      <div class="card-icon" style="background:var(--purple-bg)"><i data-lucide="book-open" style="color:var(--purple)"></i></div>
       <div><div class="card-title">Thesis</div><div class="card-subtitle">${T.daysRemaining} days — ${chaptersDone}/${chaptersTotal} chapters done</div></div>
     </div>
     ${T.chapters.map(c=>`
@@ -495,7 +498,7 @@ function render() {
   <!-- EVERLLENCE -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--teal-bg)"><span style="color:var(--teal)">💼</span></div>
+      <div class="card-icon" style="background:var(--teal-bg)"><i data-lucide="briefcase" style="color:var(--teal)"></i></div>
       <div><div class="card-title">Everllence</div><div class="card-subtitle">Work hours tracker</div></div>
     </div>
     <div class="hours-grid">
@@ -514,14 +517,14 @@ function render() {
   <!-- WEATHER -->
   <div class="card card-2col">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--blue-bg)"><span style="color:var(--blue)">🌤️</span></div>
+      <div class="card-icon" style="background:var(--blue-bg)"><i data-lucide="cloud-sun" style="color:var(--blue)"></i></div>
       <div><div class="card-title">Weather</div><div class="card-subtitle">${D.meta.location}</div></div>
     </div>
     <div class="weather-strip">
       ${D.weather.map(w=>`
         <div class="w-day ${w.isToday?'today':''}">
           <div class="w-label">${w.day}</div>
-          <div class="w-icon">${w.icon}</div>
+          <div class="w-icon"><i data-lucide="${w.icon}"></i></div>
           <div class="w-temps"><span class="w-hi">${w.hi}°</span> <span class="w-lo">${w.lo}°</span></div>
           ${w.rain>15?`<div class="w-rain">${w.rain}%</div>`:''}
         </div>
@@ -532,7 +535,7 @@ function render() {
   <!-- SCHEDULE -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--orange-bg)"><span style="color:var(--orange)">📅</span></div>
+      <div class="card-icon" style="background:var(--orange-bg)"><i data-lucide="calendar" style="color:var(--orange)"></i></div>
       <div><div class="card-title">Ahead</div><div class="card-subtitle">Next 3 days</div></div>
     </div>
     ${D.schedule.map(day=>`
@@ -552,7 +555,7 @@ function render() {
   <!-- FOOD & NUTRITION -->
   <div class="card card-2col">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--orange-bg)"><span style="color:var(--orange)">🍳</span></div>
+      <div class="card-icon" style="background:var(--orange-bg)"><i data-lucide="utensils" style="color:var(--orange)"></i></div>
       <div><div class="card-title">Food & Nutrition</div><div class="card-subtitle">${D.food.nutritionContext}</div></div>
     </div>
     <div class="food-section">
@@ -584,7 +587,7 @@ function render() {
   <!-- SUGGESTIONS -->
   <div class="card card-2col">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--purple-bg)"><span style="color:var(--purple)">💡</span></div>
+      <div class="card-icon" style="background:var(--purple-bg)"><i data-lucide="lightbulb" style="color:var(--purple)"></i></div>
       <div><div class="card-title">Suggestions</div><div class="card-subtitle">Based on your data and goals</div></div>
     </div>
     ${D.suggestions.map(s=>`
@@ -598,7 +601,7 @@ function render() {
   <!-- HABIT STREAKS -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--green-bg)"><span style="color:var(--green)">🔥</span></div>
+      <div class="card-icon" style="background:var(--green-bg)"><i data-lucide="flame" style="color:var(--green)"></i></div>
       <div><div class="card-title">Habits</div><div class="card-subtitle">7-day tracker</div></div>
     </div>
     ${D.habitStreaks.map(h=>`
@@ -615,7 +618,7 @@ function render() {
   <!-- PATTERNS -->
   <div class="card">
     <div class="card-header">
-      <div class="card-icon" style="background:var(--pink-bg)"><span style="color:var(--pink)">🔗</span></div>
+      <div class="card-icon" style="background:var(--pink-bg)"><i data-lucide="brain" style="color:var(--pink)"></i></div>
       <div><div class="card-title">Patterns</div><div class="card-subtitle">Correlations from your data</div></div>
     </div>
     ${D.patterns.map(p=>`<div class="insight-card">${p.text}</div>`).join('')}
@@ -730,6 +733,7 @@ function renderCharts() {
 }
 
 render();
+lucide.createIcons();
 </script>
 </body>
 </html>
