@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Life Optimiser — Michael Webster</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f0f2f5; --white: #ffffff; --border: #e8ecf1;
+    --text: #1a1d26; --text-secondary: #6b7280; --text-dim: #9ca3af;
+    --purple: #7c5cfc; --purple-bg: #f0ecff;
+    --red: #ef4444; --red-bg: #fef2f2;
+    --blue: #3b82f6; --blue-bg: #eff6ff;
+    --orange: #f97316; --orange-bg: #fff7ed;
+    --green: #22c55e; --green-bg: #f0fdf4;
+    --teal: #14b8a6; --teal-bg: #f0fdfa;
+    --pink: #ec4899; --pink-bg: #fdf2f8;
+    --yellow: #eab308; --yellow-bg: #fefce8;
+    --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.06);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:16px; -webkit-font-smoothing:antialiased; }
+
+  .dashboard { max-width:1360px; margin:0 auto; display:grid; gap:14px; grid-template-columns:1fr; }
+  @media(min-width:768px){ .dashboard{grid-template-columns:repeat(2,1fr);} }
+  @media(min-width:1100px){ .dashboard{grid-template-columns:repeat(3,1fr);} }
+
+  /* Header */
+  .header { grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding:20px 24px; background:var(--white); border-radius:20px; box-shadow:var(--shadow); }
+  .header-left h1 { font-size:1.5rem; font-weight:800; letter-spacing:-0.03em; color:var(--text); }
+  .header-left .subtitle { font-size:0.8rem; color:var(--text-secondary); margin-top:2px; font-weight:500; }
+  .header-badges { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .badge { display:flex; flex-direction:column; align-items:center; padding:10px 16px; border-radius:14px; }
+  .badge .num { font-size:1.5rem; font-weight:800; line-height:1; }
+  .badge .label { font-size:0.6rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; margin-top:3px; }
+  .refresh-pill { font-size:0.65rem; color:var(--text-dim); background:var(--bg); padding:5px 12px; border-radius:8px; font-weight:500; }
+
+  /* Cards */
+  .card { background:var(--white); border-radius:18px; padding:20px; box-shadow:var(--shadow); overflow:hidden; }
+  .card:hover { box-shadow:var(--shadow-md); }
+  .card-header { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .card-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+  .card-title { font-size:0.78rem; font-weight:700; color:var(--text); }
+  .card-subtitle { font-size:0.65rem; color:var(--text-dim); font-weight:500; }
+  .card-wide { grid-column:1/-1; }
+  @media(min-width:768px){ .card-2col{grid-column:span 2;} }
+
+  /* Chart containers */
+  .chart-wrap { position:relative; width:100%; }
+  .chart-wrap canvas { width:100%!important; }
+
+  /* Stat rows inside cards */
+  .stat-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:0.8rem; }
+  .stat-row:last-child { border-bottom:none; }
+  .stat-label { color:var(--text-secondary); font-weight:500; }
+  .stat-val { font-weight:700; }
+
+  /* Mini stat pills */
+  .stat-pills { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .stat-pill { flex:1; min-width:70px; text-align:center; padding:10px 8px; border-radius:12px; background:var(--bg); }
+  .stat-pill .sp-val { font-size:1.15rem; font-weight:800; display:block; line-height:1.2; }
+  .stat-pill .sp-label { font-size:0.55rem; color:var(--text-dim); font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+
+  /* Running Goals */
+  .goal-item { margin-bottom:14px; }
+  .goal-item:last-child { margin-bottom:0; }
+  .goal-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
+  .goal-name { font-size:0.8rem; font-weight:700; }
+  .goal-time { font-size:0.75rem; color:var(--text-secondary); }
+  .goal-bar { height:8px; background:var(--bg); border-radius:4px; overflow:hidden; }
+  .goal-fill { height:100%; border-radius:4px; }
+  .goal-meta { display:flex; justify-content:space-between; font-size:0.6rem; color:var(--text-dim); margin-top:3px; font-weight:500; }
+
+  /* Thesis chapters */
+  .chapter { display:flex; align-items:center; gap:10px; padding:7px 0; }
+  .ch-num { width:24px; height:24px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:0.6rem; font-weight:700; flex-shrink:0; }
+  .ch-name { flex:1; font-size:0.78rem; font-weight:500; }
+  .ch-bar { width:72px; height:6px; background:var(--bg); border-radius:3px; overflow:hidden; }
+  .ch-fill { height:100%; border-radius:3px; }
+  .ch-pct { font-size:0.65rem; font-weight:700; min-width:30px; text-align:right; }
+  .thesis-tasks { margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+  .task-item { display:flex; align-items:flex-start; gap:8px; padding:5px 0; font-size:0.75rem; line-height:1.4; }
+  .task-check { width:16px; height:16px; border-radius:5px; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:1px; font-size:0.55rem; }
+  .task-check.done { background:var(--green); border-color:var(--green); color:white; }
+
+  /* Schedule */
+  .sched-day { margin-bottom:14px; }
+  .sched-day:last-child { margin-bottom:0; }
+  .sched-label { font-size:0.65rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+  .sched-event { display:flex; align-items:center; gap:10px; padding:6px 0; font-size:0.78rem; }
+  .sched-time { color:var(--text-dim); min-width:44px; font-size:0.7rem; font-weight:600; font-variant-numeric:tabular-nums; }
+  .sched-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+  /* Suggestions */
+  .suggestion { padding:14px; border-radius:12px; margin-bottom:10px; font-size:0.78rem; line-height:1.55; }
+  .suggestion:last-child { margin-bottom:0; }
+  .s-label { font-size:0.6rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px; }
+
+  /* Habit streaks */
+  .habit { display:flex; align-items:center; gap:10px; padding:8px 0; }
+  .habit-name { font-size:0.78rem; font-weight:600; min-width:64px; }
+  .habit-dots { display:flex; gap:4px; }
+  .habit-dot { width:22px; height:22px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:0.5rem; font-weight:700; }
+  .dot-done { background:var(--green-bg); color:var(--green); }
+  .dot-miss { background:var(--bg); color:var(--text-dim); }
+  .habit-score { margin-left:auto; font-size:0.75rem; font-weight:700; }
+
+  /* Insights */
+  .insight-card { padding:12px 14px; border-radius:10px; background:var(--bg); margin-bottom:8px; font-size:0.75rem; line-height:1.55; color:var(--text-secondary); }
+  .insight-card:last-child { margin-bottom:0; }
+  .insight-card strong { color:var(--text); font-weight:600; }
+
+  /* Weather */
+  .weather-strip { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
+  .w-day { min-width:76px; padding:10px 8px; border-radius:12px; text-align:center; background:var(--bg); flex-shrink:0; }
+  .w-day.today { background:var(--blue-bg); border:1.5px solid rgba(59,130,246,0.2); }
+  .w-day .w-label { font-size:0.6rem; font-weight:600; color:var(--text-dim); }
+  .w-day .w-icon { font-size:1.3rem; margin:4px 0; }
+  .w-day .w-temps { font-size:0.7rem; }
+  .w-day .w-hi { font-weight:700; }
+  .w-day .w-lo { color:var(--text-dim); }
+  .w-day .w-rain { font-size:0.55rem; color:var(--blue); margin-top:2px; font-weight:600; }
+
+  /* Hours blocks */
+  .hours-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+  .hours-block { background:var(--bg); border-radius:12px; padding:14px; text-align:center; }
+  .hours-block .hv { font-size:1.6rem; font-weight:800; line-height:1; }
+  .hours-block .hl { font-size:0.55rem; color:var(--text-dim); font-weight:600; text-transform:uppercase; margin-top:2px; }
+
+  /* Activity table */
+  .act-table { width:100%; font-size:0.75rem; border-collapse:collapse; }
+  .act-table th { text-align:left; padding:6px 8px; font-size:0.6rem; font-weight:600; text-transform:uppercase; color:var(--text-dim); letter-spacing:0.04em; }
+  .act-table td { padding:8px; border-top:1px solid var(--border); }
+  .act-type { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+
+  /* Nutrition */
+  .meal-item { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid var(--border); font-size:0.78rem; }
+  .meal-item:last-child { border-bottom:none; }
+  .meal-time { color:var(--text-dim); font-size:0.7rem; font-weight:500; }
+
+  /* Food panel */
+  .food-section { margin-bottom:14px; }
+  .food-section:last-child { margin-bottom:0; }
+  .food-section-title { font-size:0.65rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px; }
+  .meal-suggestion { background:var(--bg); border-radius:10px; padding:12px; margin-bottom:8px; }
+  .meal-suggestion:last-child { margin-bottom:0; }
+  .ms-name { font-size:0.82rem; font-weight:700; margin-bottom:3px; }
+  .ms-reason { font-size:0.7rem; color:var(--text-secondary); line-height:1.4; }
+  .ms-tags { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
+  .ms-tag { font-size:0.55rem; font-weight:600; padding:2px 8px; border-radius:5px; text-transform:uppercase; letter-spacing:0.03em; }
+  .pantry-list { display:flex; flex-wrap:wrap; gap:5px; }
+  .pantry-chip { font-size:0.68rem; background:var(--bg); padding:4px 10px; border-radius:7px; color:var(--text-secondary); font-weight:500; }
+  .nutrition-targets { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; margin-top:8px; }
+  .nt-item { background:var(--bg); border-radius:8px; padding:8px 10px; display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; }
+  .nt-label { color:var(--text-secondary); font-weight:500; }
+  .nt-val { font-weight:700; }
+
+  /* Training plan */
+  .tp-day { margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .tp-day:last-child { margin-bottom:0; padding-bottom:0; border-bottom:none; }
+  .tp-day-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .tp-day-label { font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em; }
+  .tp-type { font-size:0.6rem; font-weight:700; padding:3px 8px; border-radius:5px; text-transform:uppercase; letter-spacing:0.03em; }
+  .tp-session { font-size:0.85rem; font-weight:700; margin-bottom:3px; }
+  .tp-details { font-size:0.75rem; color:var(--text-secondary); line-height:1.5; }
+  .tp-rationale { font-size:0.7rem; color:var(--text-dim); margin-top:5px; font-style:italic; }
+  .tp-stats { display:flex; gap:6px; margin-top:8px; }
+  .tp-stat { font-size:0.6rem; font-weight:600; padding:3px 8px; border-radius:5px; background:var(--bg); color:var(--text-secondary); }
+
+  /* Location pill */
+  .location-pill { display:inline-flex; align-items:center; gap:4px; font-size:0.65rem; background:var(--bg); padding:3px 10px; border-radius:6px; color:var(--text-secondary); font-weight:500; margin-left:8px; }
+</style>
+</head>
+<body>
+<div class="dashboard" id="app"></div>
+
+<script>
+// ===== DATA BLOCK — Regenerated by 11PM scheduled task =====
+const DATA = {
+  meta: {
+    lastRefresh: "2026-04-04T23:07:00",
+    today: "2026-04-04",
+    dayLabel: "Saturday, April 4, 2026",
+    location: "Ireland",
+    locationNote: "Visiting Ireland (Mar 31 – Apr 8)"
+  },
+  thesis: {
+    dueDate: "2026-05-15",
+    daysRemaining: 41,
+    topic: "ML for cash flow forecasting",
+    chapters: [
+      { num:1, name:"Introduction", status:"Needs redraft", pct:15, color:"var(--red)" },
+      { num:2, name:"Literature Review", status:"Done", pct:100, color:"var(--green)" },
+      { num:3, name:"Dataset / EDA", status:"Not started", pct:0, color:"var(--red)" },
+      { num:4, name:"Methodology", status:"Done", pct:100, color:"var(--green)" },
+      { num:5, name:"Analysis & Modelling", status:"Drafting", pct:55, color:"var(--orange)" },
+      { num:6, name:"Results", status:"Not started", pct:0, color:"var(--red)" },
+      { num:7, name:"Discussion", status:"Not started", pct:0, color:"var(--red)" },
+      { num:8, name:"Conclusion", status:"Not started", pct:0, color:"var(--red)" }
+    ],
+    keyTasks: [
+      { text:"Expand Ch.5 to 30+ pages (multi-horizon, model config matrix)", done:false },
+      { text:"Write Ch.3 Dataset / EDA with visuals", done:false },
+      { text:"Redraft Ch.1 Introduction", done:false },
+      { text:"Write Ch.6 Results (final cross-BU numbers)", done:false },
+      { text:"Write Ch.7 Discussion + Ch.8 Conclusion", done:false },
+      { text:"Anti-AI writing audit passes", done:false },
+      { text:"Verify notebook blockers (feature group fix, h=2/h=3 re-runs)", done:false },
+      { text:"Pipeline and modelling code locked", done:true },
+      { text:"Royalties h=1 results confirmed (WAPE 0.3831)", done:true },
+      { text:"Ch.2 Literature Review complete", done:true },
+      { text:"Ch.4 Methodology complete", done:true }
+    ]
+  },
+  healthTrends: [
+    { date:"Mar 29", steps:21742, rhr:41, stress:24, bbHigh:81, bbLow:12, sleepScore:75, sleepHrs:7.13, hrv:101, deep:0.77, light:5.48, rem:0.88, awake:0.05 },
+    { date:"Mar 30", steps:4532,  rhr:40, stress:19, bbHigh:100,bbLow:39, sleepScore:88, sleepHrs:8.72, hrv:115, deep:0.98, light:5.97, rem:1.77, awake:0.32 },
+    { date:"Mar 31", steps:5319,  rhr:41, stress:28, bbHigh:82, bbLow:19, sleepScore:51, sleepHrs:4.13, hrv:105, deep:0.88, light:2.77, rem:0.48, awake:0.63 },
+    { date:"Apr 1",  steps:7629,  rhr:41, stress:32, bbHigh:100,bbLow:24, sleepScore:92, sleepHrs:9.48, hrv:112, deep:1.63, light:6.28, rem:1.57, awake:0.08 },
+    { date:"Apr 2",  steps:12537, rhr:40, stress:24, bbHigh:96, bbLow:29, sleepScore:86, sleepHrs:8.63, hrv:102, deep:1.35, light:5.15, rem:2.13, awake:0.35 },
+    { date:"Apr 3",  steps:7737,  rhr:39, stress:19, bbHigh:100,bbLow:41, sleepScore:94, sleepHrs:8.37, hrv:106, deep:1.18, light:5.27, rem:1.92, awake:0.07 },
+    { date:"Apr 4",  steps:2327,  rhr:40, stress:18, bbHigh:100,bbLow:50, sleepScore:95, sleepHrs:8.22, hrv:109, deep:1.58, light:5.02, rem:1.62, awake:0.02 }
+  ],
+  activities: [
+    { date:"Mar 29", name:"Lisbon Running", dist:10.03, duration:"59:57", avgHR:145, maxHR:181, pace:"5:59/km", calories:781 },
+    { date:"Apr 2",  name:"County Limerick Running", dist:6.82, duration:"42:46", avgHR:131, maxHR:148, pace:"6:16/km", calories:504 }
+  ],
+  running: {
+    prs: { fiveK:"24:23", tenK:"59:45" },
+    predictions: { fiveK:"21:10", tenK:"45:23", half:"1:43:17", marathon:"3:48:57" },
+    vo2max: 55.0,
+    weeklyKm: 16.85,
+    weekRuns: 2,
+    trainingStatus: "Recovery",
+    acuteLoad: 137,
+    chronicLoad: 283,
+    loadRatio: 0.4,
+    loadStatus: "LOW",
+    balance: "Anaerobic shortage"
+  },
+  everllence: {
+    hoursThisWeek: 0,
+    weekTarget: 20,
+    hoursThisMonth: 0,
+    monthTarget: 80,
+    note: "In Ireland — no work hours logged this week"
+  },
+  schedule: [
+    { label:"Tomorrow — Sun, Apr 5", events:[
+      { time:"—", name:"Free day (Ireland)", dot:"var(--green)" }
+    ]},
+    { label:"Monday, Apr 6", events:[
+      { time:"—", name:"Ireland — flexible day", dot:"var(--teal)" }
+    ]},
+    { label:"Tuesday, Apr 7", events:[
+      { time:"—", name:"Ireland — flexible day", dot:"var(--teal)" }
+    ]}
+  ],
+  suggestions: [
+    { cat:"Training", color:"var(--green)", bg:"var(--green-bg)", text:"Load ratio at 0.4 (low) — you're in recovery after 2 runs this week totalling 16.8km. Your body battery has been recovering well (hitting 100 three of the last four mornings). A moderate Zone 2 run of 6-8km would be well-timed if you feel good tomorrow." },
+    { cat:"Thesis", color:"var(--purple)", bg:"var(--purple-bg)", text:"41 days to deadline. 4 chapters not started, 1 needs major expansion. The critical path is Chapter 5 (Analysis & Modelling, ~19→30+ pages) because your supervisor flagged it as grade-determining. Aim for 2-3 focused morning hours daily while in Ireland." },
+    { cat:"Recovery", color:"var(--blue)", bg:"var(--blue-bg)", text:"Sleep has been excellent — 3 consecutive nights scored 86+, averaging 8.4hrs. HRV steady in the balanced range (102-109ms). Stress trending down to 18. Your body is recovering well. Maintain the current sleep routine." }
+  ],
+  patterns: [
+    { text:"After your <strong>51-score sleep night</strong> (Mar 31, only 4.1hrs), next-day stress jumped to <strong>32</strong> (highest this week) and body battery only peaked at <strong>100 after a 9.5hr recovery sleep</strong>." },
+    { text:"Your <strong>10km Lisbon run</strong> (Mar 29, HR 145 avg) was followed by a <strong>rest day</strong> with only 4,532 steps — body battery recovered to 100 overnight." },
+    { text:"<strong>Resting HR dropped to 39</strong> on Apr 3 after two consecutive excellent sleep nights (94, 95). Your 7-day average sits at <strong>40 bpm</strong>." },
+    { text:"Days with <strong>>10k steps</strong> (Mar 29: 21.7k, Apr 2: 12.5k) both included running activities. Non-run days averaged <strong>5,600 steps</strong>." }
+  ],
+  habitStreaks: [
+    { name:"Running", days:[1,0,0,0,1,0,0], labels:["29","30","31","1","2","3","4"], streak:"2 this wk", target:4 },
+    { name:"Sleep 7h+", days:[1,1,0,1,1,1,1], labels:["29","30","31","1","2","3","4"], streak:"4 streak", target:7 },
+    { name:"Steps 8k+", days:[1,0,0,0,1,0,0], labels:["29","30","31","1","2","3","4"], streak:"—", target:5 }
+  ],
+  trainingPlan: [
+    { day:"Tomorrow — Sun, Apr 5", type:"Easy Run", typeColor:"var(--green)", typeBg:"var(--green-bg)",
+      session:"Zone 2 Easy Run — 7-8km",
+      details:"Keep heart rate below 145bpm. Flat route preferred. You're in Ireland so find a comfortable loop. Include 5 min warm-up walk.",
+      rationale:"Body battery recovering well (100 this morning), 2 rest days since last run. Load ratio low at 0.4 — adding volume safely. Zone 2 builds aerobic base per your Garmin interpreter targets.",
+      stats:["Zone 2","~45 min","HR <145"] },
+    { day:"Monday, Apr 6", type:"Rest", typeColor:"var(--blue)", typeBg:"var(--blue-bg)",
+      session:"Rest Day — Walk Only",
+      details:"Light walking (30-40 min) to keep steps up. Focus morning hours on thesis. No structured training.",
+      rationale:"Monday is a work day (Everllence) and you're targeting thesis morning hours. Training load is low so a rest day won't hurt — recovery between runs matters more at this phase.",
+      stats:["Recovery","Steps target","Thesis focus"] },
+    { day:"Tuesday, Apr 7", type:"Tempo", typeColor:"var(--orange)", typeBg:"var(--orange-bg)",
+      session:"Tempo Intervals — 5-6km total",
+      details:"Warm up 1km easy, then 4 × 800m at ~4:45-5:00/km pace with 90sec recovery jog between. Cool down 1km easy.",
+      rationale:"Your Garmin flags anaerobic shortage — structured tempo work addresses this directly. Short intervals keep total stress manageable while building speed. Predicted 5K pace (21:10) suggests you can handle sub-5:00 intervals.",
+      stats:["Mixed zones","~35 min","Anaerobic work"] }
+  ],
+  food: {
+    mealSuggestions: [
+      { name:"Chicken & Chickpea Curry", time:"Dinner tonight", reason:"High-protein recovery meal after a low-activity rest day. Uses pantry staples and takes ~35 min.", tags:[{label:"High Protein",color:"var(--red)",bg:"var(--red-bg)"},{label:"Pantry",color:"var(--green)",bg:"var(--green-bg)"},{label:"35 min",color:"var(--blue)",bg:"var(--blue-bg)"}] },
+      { name:"Overnight Oats with Banana & PB", time:"Tomorrow breakfast", reason:"Easy prep tonight. Slow-release carbs for a potential morning run. No cooking needed.", tags:[{label:"Carb Load",color:"var(--orange)",bg:"var(--orange-bg)"},{label:"No Cook",color:"var(--teal)",bg:"var(--teal-bg)"},{label:"5 min prep",color:"var(--blue)",bg:"var(--blue-bg)"}] },
+      { name:"Salmon & Grain Bowl", time:"Tomorrow dinner", reason:"Omega-3 for recovery, complex carbs to refuel after Zone 2 run. Build on rice from tonight.", tags:[{label:"Omega-3",color:"var(--blue)",bg:"var(--blue-bg)"},{label:"Recovery",color:"var(--green)",bg:"var(--green-bg)"},{label:"40 min",color:"var(--blue)",bg:"var(--blue-bg)"}] }
+    ],
+    pantryHighlights: ["Chicken breast","Chickpeas","Rice","Oats","Peanut butter","Tinned tomatoes","Coconut milk","Onions","Garlic","Spinach","Eggs","Pasta"],
+    nutritionContext: "Rest day — lower calorie needs (~2,200 cal). Focus on protein for recovery (target: 130g+). Tomorrow has a potential run so carb-load at dinner.",
+    targets: { calories:"~2,200", protein:"130g+", focus:"Recovery + pre-run fuel" }
+  },
+  weather: [
+    { day:"Thu", icon:"🌧️", hi:11, lo:6, rain:60 },
+    { day:"Fri", icon:"⛅", hi:12, lo:5, rain:30 },
+    { day:"Today", icon:"🌤️", hi:13, lo:7, rain:10, isToday:true },
+    { day:"Sun", icon:"☁️", hi:11, lo:5, rain:40 },
+    { day:"Mon", icon:"🌧️", hi:10, lo:4, rain:65 },
+    { day:"Tue", icon:"⛅", hi:12, lo:6, rain:25 }
+  ]
+};
+// ===== END DATA BLOCK =====
+
+function render() {
+  const D = DATA, T = D.thesis, R = D.running;
+  const avgSleep = (D.healthTrends.reduce((s,d)=>s+d.sleepScore,0)/7).toFixed(0);
+  const avgHRV = (D.healthTrends.reduce((s,d)=>s+d.hrv,0)/7).toFixed(0);
+  const avgStress = (D.healthTrends.reduce((s,d)=>s+d.stress,0)/7).toFixed(0);
+  const avgSteps = (D.healthTrends.reduce((s,d)=>s+d.steps,0)/7).toFixed(0);
+  const chaptersDone = T.chapters.filter(c=>c.pct===100).length;
+  const chaptersTotal = T.chapters.length;
+
+  let html = `
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Life Optimiser</h1>
+      <div class="subtitle">${D.meta.dayLabel}<span class="location-pill">${D.meta.location}</span></div>
+    </div>
+    <div class="header-badges">
+      <div class="badge" style="background:var(--purple-bg)">
+        <span class="num" style="color:var(--purple)">${T.daysRemaining}</span>
+        <span class="label" style="color:var(--purple)">Days to thesis</span>
+      </div>
+      <div class="badge" style="background:var(--green-bg)">
+        <span class="num" style="color:var(--green)">${R.vo2max}</span>
+        <span class="label" style="color:var(--green)">VO₂ Max</span>
+      </div>
+      <span class="refresh-pill">Updated ${new Date(D.meta.lastRefresh).toLocaleString('en-GB',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}</span>
+    </div>
+  </div>
+
+  <!-- 7-DAY AVERAGES -->
+  <div class="card card-wide">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--blue-bg)"><span style="color:var(--blue)">📊</span></div>
+      <div><div class="card-title">7-Day Averages</div><div class="card-subtitle">Mar 29 – Apr 4</div></div>
+    </div>
+    <div class="stat-pills">
+      <div class="stat-pill"><span class="sp-val" style="color:var(--blue)">${avgSleep}</span><span class="sp-label">Sleep Score</span></div>
+      <div class="stat-pill"><span class="sp-val" style="color:var(--teal)">${avgHRV}<small style="font-size:0.6em;color:var(--text-dim)">ms</small></span><span class="sp-label">Avg HRV</span></div>
+      <div class="stat-pill"><span class="sp-val" style="color:var(--red)">40</span><span class="sp-label">Resting HR</span></div>
+      <div class="stat-pill"><span class="sp-val" style="color:var(--orange)">${avgStress}</span><span class="sp-label">Avg Stress</span></div>
+      <div class="stat-pill"><span class="sp-val" style="color:var(--green)">${(avgSteps/1000).toFixed(1)}<small style="font-size:0.6em;color:var(--text-dim)">k</small></span><span class="sp-label">Avg Steps</span></div>
+      <div class="stat-pill"><span class="sp-val" style="color:var(--purple)">${R.weeklyKm}<small style="font-size:0.6em;color:var(--text-dim)">km</small></span><span class="sp-label">Running</span></div>
+    </div>
+  </div>
+
+  <!-- SLEEP TRENDS -->
+  <div class="card card-2col">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--blue-bg)"><span style="color:var(--blue)">🌙</span></div>
+      <div><div class="card-title">Sleep</div><div class="card-subtitle">Score & duration over 7 nights</div></div>
+    </div>
+    <div class="chart-wrap"><canvas id="sleepChart" height="180"></canvas></div>
+  </div>
+
+  <!-- BODY BATTERY RANGE -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--green-bg)"><span style="color:var(--green)">🔋</span></div>
+      <div><div class="card-title">Body Battery</div><div class="card-subtitle">Daily high → low range</div></div>
+    </div>
+    <div class="chart-wrap"><canvas id="bbChart" height="180"></canvas></div>
+  </div>
+
+  <!-- HRV + STRESS + RHR -->
+  <div class="card card-2col">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--teal-bg)"><span style="color:var(--teal)">💓</span></div>
+      <div><div class="card-title">HRV, Stress & Resting HR</div><div class="card-subtitle">7-day trends</div></div>
+    </div>
+    <div class="chart-wrap"><canvas id="hrvChart" height="170"></canvas></div>
+  </div>
+
+  <!-- STEPS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--orange-bg)"><span style="color:var(--orange)">👟</span></div>
+      <div><div class="card-title">Daily Steps</div><div class="card-subtitle">vs adaptive goal</div></div>
+    </div>
+    <div class="chart-wrap"><canvas id="stepsChart" height="180"></canvas></div>
+  </div>
+
+  <!-- RUNNING & RACE PREDICTIONS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--green-bg)"><span style="color:var(--green)">🏃</span></div>
+      <div><div class="card-title">Running Goals</div><div class="card-subtitle">PR vs Garmin prediction</div></div>
+    </div>
+    <div class="goal-item">
+      <div class="goal-top"><span class="goal-name" style="color:var(--green)">5K</span><span class="goal-time">Predicted: ${R.predictions.fiveK}</span></div>
+      <div class="goal-bar"><div class="goal-fill" style="width:72%;background:linear-gradient(90deg,var(--green),var(--teal))"></div></div>
+      <div class="goal-meta"><span>PR: ${R.prs.fiveK}</span><span>Predicted: ${R.predictions.fiveK}</span></div>
+    </div>
+    <div class="goal-item">
+      <div class="goal-top"><span class="goal-name" style="color:var(--blue)">10K</span><span class="goal-time">Predicted: ${R.predictions.tenK}</span></div>
+      <div class="goal-bar"><div class="goal-fill" style="width:56%;background:linear-gradient(90deg,var(--blue),var(--purple))"></div></div>
+      <div class="goal-meta"><span>PR: ${R.prs.tenK}</span><span>Predicted: ${R.predictions.tenK}</span></div>
+    </div>
+    <div class="goal-item">
+      <div class="goal-top"><span class="goal-name" style="color:var(--purple)">Half Marathon</span><span class="goal-time">${R.predictions.half}</span></div>
+      <div class="goal-bar"><div class="goal-fill" style="width:40%;background:linear-gradient(90deg,var(--purple),var(--pink))"></div></div>
+      <div class="goal-meta"><span>No PR yet</span><span>Predicted: ${R.predictions.half}</span></div>
+    </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+      <div class="stat-row"><span class="stat-label">This week</span><span class="stat-val">${R.weeklyKm}km / ${R.weekRuns} runs</span></div>
+      <div class="stat-row"><span class="stat-label">Training status</span><span class="stat-val" style="color:var(--blue)">${R.trainingStatus}</span></div>
+      <div class="stat-row"><span class="stat-label">Load ratio</span><span class="stat-val">${R.loadRatio} (${R.loadStatus})</span></div>
+      <div class="stat-row"><span class="stat-label">Balance</span><span class="stat-val" style="color:var(--orange)">${R.balance}</span></div>
+    </div>
+  </div>
+
+  <!-- TRAINING LOG -->
+  <div class="card card-2col">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--orange-bg)"><span style="color:var(--orange)">📋</span></div>
+      <div><div class="card-title">Training Log</div><div class="card-subtitle">Activities this week</div></div>
+    </div>
+    <table class="act-table">
+      <tr><th>Date</th><th>Activity</th><th>Distance</th><th>Time</th><th>Pace</th><th>Avg HR</th></tr>
+      ${D.activities.map(a=>`
+        <tr>
+          <td style="color:var(--text-dim)">${a.date}</td>
+          <td><span class="act-type" style="background:var(--green)"></span>${a.name}</td>
+          <td>${a.dist}km</td>
+          <td>${a.duration}</td>
+          <td>${a.pace}</td>
+          <td>${a.avgHR} bpm</td>
+        </tr>
+      `).join('')}
+    </table>
+  </div>
+
+  <!-- TRAINING PLAN -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--green-bg)"><span style="color:var(--green)">📝</span></div>
+      <div><div class="card-title">Training Plan</div><div class="card-subtitle">Next 3 days</div></div>
+    </div>
+    ${D.trainingPlan.map(tp=>`
+      <div class="tp-day">
+        <div class="tp-day-header">
+          <span class="tp-day-label">${tp.day}</span>
+          <span class="tp-type" style="background:${tp.typeBg};color:${tp.typeColor}">${tp.type}</span>
+        </div>
+        <div class="tp-session">${tp.session}</div>
+        <div class="tp-details">${tp.details}</div>
+        <div class="tp-rationale">${tp.rationale}</div>
+        <div class="tp-stats">${tp.stats.map(s=>`<span class="tp-stat">${s}</span>`).join('')}</div>
+      </div>
+    `).join('')}
+  </div>
+
+  <!-- THESIS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--purple-bg)"><span style="color:var(--purple)">📚</span></div>
+      <div><div class="card-title">Thesis</div><div class="card-subtitle">${T.daysRemaining} days — ${chaptersDone}/${chaptersTotal} chapters done</div></div>
+    </div>
+    ${T.chapters.map(c=>`
+      <div class="chapter">
+        <div class="ch-num" style="background:${c.pct===100?'var(--green-bg)':c.pct>0?'var(--orange-bg)':'var(--red-bg)'};color:${c.pct===100?'var(--green)':c.pct>0?'var(--orange)':'var(--red)'}">${c.num}</div>
+        <span class="ch-name">${c.name}</span>
+        <div class="ch-bar"><div class="ch-fill" style="width:${c.pct}%;background:${c.color}"></div></div>
+        <span class="ch-pct" style="color:${c.color}">${c.pct}%</span>
+      </div>
+    `).join('')}
+    <div class="thesis-tasks">
+      <div style="font-size:0.65rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Key Tasks</div>
+      ${T.keyTasks.map(t=>`
+        <div class="task-item">
+          <span class="task-check ${t.done?'done':''}">${t.done?'✓':''}</span>
+          <span style="${t.done?'text-decoration:line-through;color:var(--text-dim)':''}">${t.text}</span>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+
+  <!-- EVERLLENCE -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--teal-bg)"><span style="color:var(--teal)">💼</span></div>
+      <div><div class="card-title">Everllence</div><div class="card-subtitle">Work hours tracker</div></div>
+    </div>
+    <div class="hours-grid">
+      <div class="hours-block">
+        <div class="hv" style="color:var(--teal)">${D.everllence.hoursThisWeek}<small style="font-size:0.5em;color:var(--text-dim)">/${D.everllence.weekTarget}h</small></div>
+        <div class="hl">This Week</div>
+      </div>
+      <div class="hours-block">
+        <div class="hv" style="color:var(--teal)">${D.everllence.hoursThisMonth}<small style="font-size:0.5em;color:var(--text-dim)">/${D.everllence.monthTarget}h</small></div>
+        <div class="hl">April</div>
+      </div>
+    </div>
+    <div style="font-size:0.75rem;color:var(--text-dim);text-align:center;padding:8px;background:var(--bg);border-radius:8px">${D.everllence.note}</div>
+  </div>
+
+  <!-- WEATHER -->
+  <div class="card card-2col">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--blue-bg)"><span style="color:var(--blue)">🌤️</span></div>
+      <div><div class="card-title">Weather</div><div class="card-subtitle">${D.meta.location}</div></div>
+    </div>
+    <div class="weather-strip">
+      ${D.weather.map(w=>`
+        <div class="w-day ${w.isToday?'today':''}">
+          <div class="w-label">${w.day}</div>
+          <div class="w-icon">${w.icon}</div>
+          <div class="w-temps"><span class="w-hi">${w.hi}°</span> <span class="w-lo">${w.lo}°</span></div>
+          ${w.rain>15?`<div class="w-rain">${w.rain}%</div>`:''}
+        </div>
+      `).join('')}
+    </div>
+  </div>
+
+  <!-- SCHEDULE -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--orange-bg)"><span style="color:var(--orange)">📅</span></div>
+      <div><div class="card-title">Ahead</div><div class="card-subtitle">Next 3 days</div></div>
+    </div>
+    ${D.schedule.map(day=>`
+      <div class="sched-day">
+        <div class="sched-label">${day.label}</div>
+        ${day.events.map(e=>`
+          <div class="sched-event">
+            <span class="sched-time">${e.time}</span>
+            <span class="sched-dot" style="background:${e.dot}"></span>
+            <span>${e.name}</span>
+          </div>
+        `).join('')}
+      </div>
+    `).join('')}
+  </div>
+
+  <!-- FOOD & NUTRITION -->
+  <div class="card card-2col">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--orange-bg)"><span style="color:var(--orange)">🍳</span></div>
+      <div><div class="card-title">Food & Nutrition</div><div class="card-subtitle">${D.food.nutritionContext}</div></div>
+    </div>
+    <div class="food-section">
+      <div class="food-section-title">Meal Suggestions</div>
+      ${D.food.mealSuggestions.map(m=>`
+        <div class="meal-suggestion">
+          <div class="ms-name">${m.name} <span style="font-size:0.65rem;font-weight:500;color:var(--text-dim)">— ${m.time}</span></div>
+          <div class="ms-reason">${m.reason}</div>
+          <div class="ms-tags">${m.tags.map(t=>`<span class="ms-tag" style="background:${t.bg};color:${t.color}">${t.label}</span>`).join('')}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="food-section">
+      <div class="food-section-title">Pantry Staples</div>
+      <div class="pantry-list">
+        ${D.food.pantryHighlights.map(p=>`<span class="pantry-chip">${p}</span>`).join('')}
+      </div>
+    </div>
+    <div class="food-section">
+      <div class="food-section-title">Today's Targets</div>
+      <div class="nutrition-targets">
+        <div class="nt-item"><span class="nt-label">Calories</span><span class="nt-val" style="color:var(--orange)">${D.food.targets.calories}</span></div>
+        <div class="nt-item"><span class="nt-label">Protein</span><span class="nt-val" style="color:var(--red)">${D.food.targets.protein}</span></div>
+        <div class="nt-item" style="grid-column:span 2"><span class="nt-label">Focus</span><span class="nt-val" style="color:var(--teal)">${D.food.targets.focus}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUGGESTIONS -->
+  <div class="card card-2col">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--purple-bg)"><span style="color:var(--purple)">💡</span></div>
+      <div><div class="card-title">Suggestions</div><div class="card-subtitle">Based on your data and goals</div></div>
+    </div>
+    ${D.suggestions.map(s=>`
+      <div class="suggestion" style="background:${s.bg}">
+        <div class="s-label" style="color:${s.color}">${s.cat}</div>
+        ${s.text}
+      </div>
+    `).join('')}
+  </div>
+
+  <!-- HABIT STREAKS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--green-bg)"><span style="color:var(--green)">🔥</span></div>
+      <div><div class="card-title">Habits</div><div class="card-subtitle">7-day tracker</div></div>
+    </div>
+    ${D.habitStreaks.map(h=>`
+      <div class="habit">
+        <span class="habit-name">${h.name}</span>
+        <div class="habit-dots">
+          ${h.days.map((d,i)=>`<div class="habit-dot ${d?'dot-done':'dot-miss'}" title="${h.labels[i]}">${d?'✓':'·'}</div>`).join('')}
+        </div>
+        <span class="habit-score" style="color:${h.streak.includes('streak')?'var(--green)':'var(--text-dim)'}">${h.streak}</span>
+      </div>
+    `).join('')}
+  </div>
+
+  <!-- PATTERNS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:var(--pink-bg)"><span style="color:var(--pink)">🔗</span></div>
+      <div><div class="card-title">Patterns</div><div class="card-subtitle">Correlations from your data</div></div>
+    </div>
+    ${D.patterns.map(p=>`<div class="insight-card">${p.text}</div>`).join('')}
+  </div>
+  `;
+
+  document.getElementById('app').innerHTML = html;
+  renderCharts();
+}
+
+function renderCharts() {
+  const H = DATA.healthTrends;
+  const labels = H.map(d=>d.date);
+  const gridColor = 'rgba(0,0,0,0.04)';
+  const tickFont = { family:'Inter,system-ui,sans-serif', size:10, weight:'500' };
+  const tickColor = '#9ca3af';
+
+  Chart.defaults.elements.point.radius = 4;
+  Chart.defaults.elements.point.hoverRadius = 6;
+  Chart.defaults.elements.line.borderWidth = 2.5;
+
+  // SLEEP: combo chart — bars for hours, line for score
+  new Chart(document.getElementById('sleepChart'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { type:'bar', label:'Deep', data:H.map(d=>d.deep), backgroundColor:'#6366f1', borderRadius:3, order:2 },
+        { type:'bar', label:'Light', data:H.map(d=>d.light), backgroundColor:'#93c5fd', borderRadius:3, order:2 },
+        { type:'bar', label:'REM', data:H.map(d=>d.rem), backgroundColor:'#06b6d4', borderRadius:3, order:2 },
+        { type:'line', label:'Score', data:H.map(d=>d.sleepScore), borderColor:'#1e40af', backgroundColor:'transparent', yAxisID:'y1', tension:0.35, pointBackgroundColor:'#1e40af', pointBorderColor:'#fff', pointBorderWidth:2, order:1 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{color:tickColor,font:tickFont,boxWidth:10,padding:10},position:'top' } },
+      scales:{
+        x:{ stacked:true, grid:{display:false}, ticks:{color:tickColor,font:tickFont} },
+        y:{ stacked:true, grid:{color:gridColor}, ticks:{color:tickColor,font:tickFont,callback:v=>v+'h'}, title:{display:false} },
+        y1:{ position:'right', min:40, max:100, grid:{display:false}, ticks:{color:'#1e40af',font:tickFont} }
+      }
+    }
+  });
+
+  // BODY BATTERY: floating bars (high-low range)
+  new Chart(document.getElementById('bbChart'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'Range',
+        data:H.map(d=>[d.bbLow, d.bbHigh]),
+        backgroundColor:H.map(d=>{
+          const avg = (d.bbHigh+d.bbLow)/2;
+          return avg>60?'rgba(34,197,94,0.6)':avg>40?'rgba(234,179,8,0.6)':'rgba(239,68,68,0.6)';
+        }),
+        borderRadius:6, borderSkipped:false, barPercentage:0.55
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:ctx=>`High: ${ctx.raw[1]}  Low: ${ctx.raw[0]}` } } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{color:tickColor,font:tickFont} },
+        y:{ min:0, max:100, grid:{color:gridColor}, ticks:{color:tickColor,font:tickFont} }
+      }
+    }
+  });
+
+  // HRV + STRESS + RHR
+  new Chart(document.getElementById('hrvChart'), {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        { label:'HRV (ms)', data:H.map(d=>d.hrv), borderColor:'#14b8a6', backgroundColor:'rgba(20,184,166,0.08)', fill:true, tension:0.4, pointBackgroundColor:'#14b8a6', pointBorderColor:'#fff', pointBorderWidth:2 },
+        { label:'Stress', data:H.map(d=>d.stress), borderColor:'#f97316', backgroundColor:'rgba(249,115,22,0.08)', fill:true, tension:0.4, pointBackgroundColor:'#f97316', pointBorderColor:'#fff', pointBorderWidth:2, yAxisID:'y1' },
+        { label:'RHR', data:H.map(d=>d.rhr), borderColor:'#ef4444', tension:0.4, borderDash:[5,5], pointBackgroundColor:'#ef4444', pointBorderColor:'#fff', pointBorderWidth:2, yAxisID:'y1' }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{color:tickColor,font:tickFont,boxWidth:10,padding:10},position:'top' } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{color:tickColor,font:tickFont} },
+        y:{ position:'left', min:80, max:130, grid:{color:gridColor}, ticks:{color:'#14b8a6',font:tickFont} },
+        y1:{ position:'right', min:10, max:50, grid:{display:false}, ticks:{color:'#f97316',font:tickFont} }
+      }
+    }
+  });
+
+  // STEPS: bar chart
+  const stepGoals = [9180,11180,10520,9480,9110,9460,9290];
+  new Chart(document.getElementById('stepsChart'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Steps', data:H.map(d=>d.steps), backgroundColor:H.map((d,i)=>d.steps>=stepGoals[i]?'rgba(34,197,94,0.7)':'rgba(249,115,22,0.5)'), borderRadius:6, barPercentage:0.6 },
+        { type:'line', label:'Goal', data:stepGoals, borderColor:'#9ca3af', borderDash:[4,4], borderWidth:1.5, pointRadius:0, fill:false }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{color:tickColor,font:tickFont,boxWidth:10,padding:10},position:'top' } },
+      scales:{
+        x:{ grid:{display:false}, ticks:{color:tickColor,font:tickFont} },
+        y:{ grid:{color:gridColor}, ticks:{color:tickColor,font:tickFont,callback:v=>(v/1000)+'k'} }
+      }
+    }
+  });
+}
+
+render();
+</script>
+</body>
+</html>
