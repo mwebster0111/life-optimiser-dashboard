@@ -51,17 +51,17 @@ def get_garmin_client():
         # Use saved session tokens to avoid rate limiting on cloud IPs
         try:
             session_data = json.loads(session_json)
-            from garth import Client as GarthClient
-            from garth.sso import OAuth1Token, OAuth2Token
+            token_dir = "/tmp/garmin_tokens"
+            os.makedirs(token_dir, exist_ok=True)
 
-            if session_data.get("oauth1_token"):
-                client.garth.oauth1_token = OAuth1Token.deserialize(session_data["oauth1_token"])
-            if session_data.get("oauth2_token"):
-                client.garth.oauth2_token = OAuth2Token.deserialize(session_data["oauth2_token"])
+            # Write token files from the bundled JSON
+            for filename, content in session_data.items():
+                with open(os.path.join(token_dir, filename), "w") as f:
+                    f.write(content)
 
-            # Try to use existing tokens, refresh if needed
-            client.garth.exchange()
-            client.display_name = client.get_full_name()
+            # Load tokens using garth's native method
+            client.garth.load(token_dir)
+            client.login()
             print("Garmin: logged in via session token")
             return client
         except Exception as e:
