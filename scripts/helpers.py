@@ -11,7 +11,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import requests
-from garminconnect import Garmin
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
@@ -38,38 +37,91 @@ def today_str():
     return copenhagen_now()["date"]
 
 
-# ── Garmin ───────────────────────────────────────────────────────
+# ── Garmin (Direct API with browser-captured session) ────────────
+GARMIN_CONNECT_API = "https://connect.garmin.com"
+
+
+class GarminAPI:
+    """Direct Garmin Connect API client using browser-captured session cookies/tokens."""
+
+    def __init__(self, session_json):
+        session_data = json.loads(session_json)
+        self.cookies = session_data.get("cookies", {})
+        self.oauth = session_data.get("oauth_tokens", {})
+
+        self.session = requests.Session()
+        for name, value in self.cookies.items():
+            self.session.cookies.set(name, value, domain=".garmin.com")
+
+        self.session.headers.update({
+            "NK": "NT",
+            "Di-Backend": "connectapi.garmin.com",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+        })
+        if self.oauth.get("access_token"):
+            self.session.headers["Authorization"] = f"Bearer {self.oauth['access_token']}"
+
+    def _get(self, path, params=None):
+        url = f"{GARMIN_CONNECT_API}{path}"
+        resp = self.session.get(url, params=params)
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_stats(self, date_str):
+        return self._get(f"/usersummary-service/usersummary/daily/{date_str}")
+
+    def get_sleep_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailySleepData/{date_str}")
+
+    def get_heart_rates(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailyHeartRate/{date_str}")
+
+    def get_stress_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailyStress/{date_str}")
+
+    def get_body_battery(self, date_str):
+        return self._get(f"/wellness-service/wellness/bodyBattery/dates/{date_str}/{date_str}")
+
+    def get_steps_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailySteps/{date_str}")
+
+    def get_hrv_data(self, date_str):
+        return self._get(f"/hrv-service/hrv/{date_str}")
+
+    def get_activities_by_date(self, start_date, end_date):
+        return self._get(f"/activitylist-service/activities/search/activities",
+                        params={"startDate": start_date, "endDate": end_date, "limit": 20})
+
+    def get_training_status(self, date_str):
+        return self._get(f"/metrics-service/metrics/trainingstatus/aggregated/{date_str}")
+
+    def get_training_readiness(self, date_str):
+        return self._get(f"/metrics-service/metrics/trainingreadiness/{date_str}")
+
+    def get_race_predictions(self):
+        return self._get(f"/metrics-service/metrics/racepredictions")
+
+    def get_endurance_score(self, date_str):
+        return self._get(f"/metrics-service/metrics/endurancescore/{date_str}")
+
+    def get_full_name(self):
+        data = self._get("/userprofile-service/usersettings")
+        return data.get("displayName", data.get("userName", "Unknown"))
+
+
 def get_garmin_client():
-    """Connect to Garmin using session token (preferred) or email/password fallback."""
-    email = os.environ.get("GARMIN_EMAIL", "")
-    password = os.environ.get("GARMIN_PASSWORD", "")
+    """Create a Garmin API client from session tokens."""
     session_json = os.environ.get("GARMIN_SESSION", "")
 
-    client = Garmin(email, password)
+    if not session_json:
+        raise RuntimeError(
+            "GARMIN_SESSION secret not set. Run get_garmin_token.py locally "
+            "to capture browser session tokens."
+        )
 
-    if session_json:
-        # Use saved session tokens to avoid rate limiting on cloud IPs
-        try:
-            session_data = json.loads(session_json)
-            token_dir = "/tmp/garmin_tokens"
-            os.makedirs(token_dir, exist_ok=True)
-
-            # Write token files from the bundled JSON
-            for filename, content in session_data.items():
-                with open(os.path.join(token_dir, filename), "w") as f:
-                    f.write(content)
-
-            # Load tokens using garth's native method
-            client.garth.load(token_dir)
-            client.login()
-            print("Garmin: logged in via session token")
-            return client
-        except Exception as e:
-            print(f"Garmin: session token failed ({e}), trying password login...")
-
-    # Fallback to direct login
-    client.login()
-    print("Garmin: logged in via password")
+    client = GarminAPI(session_json)
+    name = client.get_full_name()
+    print(f"Garmin: connected as {name}")
     return client
 
 
