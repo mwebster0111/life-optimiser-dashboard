@@ -1,4 +1,5 @@
 garminconnect>=0.2.25
+garth>=0.4.0
 anthropic>=0.42.0
 requests>=2.31.0
 google-auth>=2.29.0

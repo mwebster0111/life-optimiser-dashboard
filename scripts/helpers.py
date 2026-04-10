@@ -40,10 +40,36 @@ def today_str():
 
 # ── Garmin ───────────────────────────────────────────────────────
 def get_garmin_client():
-    email = os.environ["GARMIN_EMAIL"]
-    password = os.environ["GARMIN_PASSWORD"]
+    """Connect to Garmin using session token (preferred) or email/password fallback."""
+    email = os.environ.get("GARMIN_EMAIL", "")
+    password = os.environ.get("GARMIN_PASSWORD", "")
+    session_json = os.environ.get("GARMIN_SESSION", "")
+
     client = Garmin(email, password)
+
+    if session_json:
+        # Use saved session tokens to avoid rate limiting on cloud IPs
+        try:
+            session_data = json.loads(session_json)
+            from garth import Client as GarthClient
+            from garth.sso import OAuth1Token, OAuth2Token
+
+            if session_data.get("oauth1_token"):
+                client.garth.oauth1_token = OAuth1Token.deserialize(session_data["oauth1_token"])
+            if session_data.get("oauth2_token"):
+                client.garth.oauth2_token = OAuth2Token.deserialize(session_data["oauth2_token"])
+
+            # Try to use existing tokens, refresh if needed
+            client.garth.exchange()
+            client.display_name = client.get_full_name()
+            print("Garmin: logged in via session token")
+            return client
+        except Exception as e:
+            print(f"Garmin: session token failed ({e}), trying password login...")
+
+    # Fallback to direct login
     client.login()
+    print("Garmin: logged in via password")
     return client
 
 
