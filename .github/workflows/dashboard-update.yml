@@ -1,0 +1,43 @@
+name: Life Optimiser — Dashboard Update
+
+on:
+  schedule:
+    # 11:20 PM Copenhagen time (UTC+2 CEST)
+    # Using 21:20 UTC for CEST (summer), adjust to 22:20 UTC for CET (winter)
+    - cron: '20 21 * * *'
+  workflow_dispatch: # Allow manual triggers
+
+jobs:
+  dashboard-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Set timezone
+        run: sudo timedatectl set-timezone Europe/Copenhagen
+
+      - name: Run dashboard update
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GCAL_CLIENT_ID: ${{ secrets.GCAL_CLIENT_ID }}
+          GCAL_CLIENT_SECRET: ${{ secrets.GCAL_CLIENT_SECRET }}
+          GCAL_REFRESH_TOKEN: ${{ secrets.GCAL_REFRESH_TOKEN }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          TZ: Europe/Copenhagen
+        run: python scripts/dashboard_update.py

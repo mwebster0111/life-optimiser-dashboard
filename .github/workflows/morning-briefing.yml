@@ -1,0 +1,42 @@
+name: Life Optimiser — Morning Briefing
+
+on:
+  schedule:
+    # 8:30 AM Copenhagen time (UTC+2 CEST)
+    # Using 06:30 UTC for CEST (summer), adjust to 07:30 UTC for CET (winter)
+    - cron: '30 6 * * *'
+  workflow_dispatch: # Allow manual triggers
+
+jobs:
+  morning-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Set timezone
+        run: sudo timedatectl set-timezone Europe/Copenhagen
+
+      - name: Run morning briefing
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GCAL_CLIENT_ID: ${{ secrets.GCAL_CLIENT_ID }}
+          GCAL_CLIENT_SECRET: ${{ secrets.GCAL_CLIENT_SECRET }}
+          GCAL_REFRESH_TOKEN: ${{ secrets.GCAL_REFRESH_TOKEN }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          TZ: Europe/Copenhagen
+        run: python scripts/morning_briefing.py
