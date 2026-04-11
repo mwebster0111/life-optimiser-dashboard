@@ -66,7 +66,9 @@ def get_garmin_client():
     garth.resume(token_dir)
 
     # Create Garmin client with loaded garth session
-    client = Garmin()
+    email = os.environ.get("GARMIN_EMAIL", "user@example.com")
+    password = os.environ.get("GARMIN_PASSWORD", "placeholder")
+    client = Garmin(email, password)
     client.garth = garth.client
     client.login()
 
