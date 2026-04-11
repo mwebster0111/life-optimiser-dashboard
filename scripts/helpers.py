@@ -11,118 +11,52 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import requests
-import garth
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 
-# ── Timezone helper ──────────────────────────────────────────────
-def copenhagen_now():
-    """Return current datetime in Copenhagen (UTC+1 / UTC+2 DST)."""
-    import subprocess
-    result = subprocess.run(
-        ["date", "+%Y-%m-%d %H:%M:%S %A %B %-d %Y %z"],
-        capture_output=True, text=True,
-        env={**os.environ, "TZ": "Europe/Copenhagen"}
-    )
-    parts = result.stdout.strip().split(" ", 2)
-    date_str = parts[0]  # 2026-04-10
-    return {
-        "date": date_str,
-        "full_output": result.stdout.strip(),
-        "day_of_week": result.stdout.strip().split()[2],  # e.g. "Friday"
-    }
-
-
-def today_str():
-    return copenhagen_now()["date"]
-
-
-# ── Garmin (direct API via garth tokens — bypasses broken garminconnect) ──
+# -- Garmin (raw HTTP with Bearer token) --
 class GarminClient:
-    """Direct Garmin Connect API using garth for OAuth token management."""
-
     BASE = "https://connect.garmin.com"
-
-    def __init__(self):
-        pass
-
+    def __init__(self, access_token):
+        import requests as _r
+        self.session = _r.Session()
+        self.session.headers.update({"Authorization": f"Bearer {access_token}", "DI-Backend": "connectapi.garmin.com", "NK": "NT"})
     def _get(self, path, **kwargs):
-        """Make authenticated GET request via garth."""
-        url = f"{self.BASE}{path}"
-        resp = garth.client.connectapi(url, **kwargs)
-        return resp
-
-    def get_stats(self, date_str):
-        return self._get(f"/usersummary-service/stats/{date_str}")
-
-    def get_sleep_data(self, date_str):
-        return self._get(f"/wellness-service/wellness/dailySleepData/{date_str}")
-
-    def get_heart_rates(self, date_str):
-        return self._get(f"/wellness-service/wellness/dailyHeartRate/{date_str}")
-
-    def get_stress_data(self, date_str):
-        return self._get(f"/wellness-service/wellness/dailyStress/{date_str}")
-
-    def get_body_battery(self, date_str):
-        return self._get(f"/wellness-service/wellness/bodyBattery/dates/{date_str}/{date_str}")
-
-    def get_steps_data(self, date_str):
-        return self._get(f"/wellness-service/wellness/dailySteps/{date_str}")
-
-    def get_hrv_data(self, date_str):
-        return self._get(f"/hrv-service/hrv/{date_str}")
-
-    def get_activities_by_date(self, start_date, end_date):
-        return self._get(
-            f"/activitylist-service/activities/search/activities",
-            params={"startDate": start_date, "endDate": end_date, "limit": 20}
-        )
-
-    def get_training_status(self, date_str):
-        return self._get(f"/metrics-service/metrics/trainingstatus/aggregated/{date_str}")
-
-    def get_training_readiness(self, date_str):
-        return self._get(f"/metrics-service/metrics/trainingreadiness/{date_str}")
-
-    def get_race_predictions(self):
-        return self._get(f"/metrics-service/metrics/racepredictions")
-
-    def get_endurance_score(self, date_str):
-        return self._get(f"/metrics-service/metrics/endurancescore/{date_str}")
-
+        resp = self.session.get(f"{self.BASE}{path}", params=kwargs.get("params"))
+        resp.raise_for_status()
+        return resp.json()
+    def get_stats(self, d): return self._get(f"/usersummary-service/stats/{d}")
+    def get_sleep_data(self, d): return self._get(f"/wellness-service/wellness/dailySleepData/{d}")
+    def get_heart_rates(self, d): return self._get(f"/wellness-service/wellness/dailyHeartRate/{d}")
+    def get_stress_data(self, d): return self._get(f"/wellness-service/wellness/dailyStress/{d}")
+    def get_body_battery(self, d): return self._get(f"/wellness-service/wellness/bodyBattery/dates/{d}/{d}")
+    def get_steps_data(self, d): return self._get(f"/wellness-service/wellness/dailySteps/{d}")
+    def get_hrv_data(self, d): return self._get(f"/hrv-service/hrv/{d}")
+    def get_activities_by_date(self, s, e): return self._get("/activitylist-service/activities/search/activities", params={"startDate": s, "endDate": e, "limit": 20})
+    def get_training_status(self, d): return self._get(f"/metrics-service/metrics/trainingstatus/aggregated/{d}")
+    def get_training_readiness(self, d): return self._get(f"/metrics-service/metrics/trainingreadiness/{d}")
+    def get_race_predictions(self): return self._get("/metrics-service/metrics/racepredictions")
+    def get_endurance_score(self, d): return self._get(f"/metrics-service/metrics/endurancescore/{d}")
     def get_full_name(self):
         data = self._get("/userprofile-service/usersettings")
         return data.get("displayName", data.get("userName", "Unknown"))
 
-
 def get_garmin_client():
-    """Set up garth with saved tokens and return a direct API client."""
-    session_json = os.environ.get("GARMIN_SESSION", "")
-
-    if not session_json:
-        raise RuntimeError("GARMIN_SESSION secret not set.")
-
-    session_data = json.loads(session_json)
-
-    # Write garth token files to a temp directory
-    token_dir = "/tmp/garth_tokens"
-    os.makedirs(token_dir, exist_ok=True)
-
-    with open(os.path.join(token_dir, "oauth1_token.json"), "w") as f:
-        json.dump(session_data["oauth1"], f)
-    with open(os.path.join(token_dir, "oauth2_token.json"), "w") as f:
-        json.dump(session_data["oauth2"], f)
-
-    # Load tokens into garth — it handles refresh automatically
-    garth.resume(token_dir)
-
-    client = GarminClient()
+    import json as _j
+    raw = os.environ.get("GARMIN_SESSION", "").strip()
+    if not raw: raise RuntimeError("GARMIN_SESSION not set")
+    token = None
+    if raw.startswith("{"):
+        d = _j.loads(raw)
+        token = d.get("oauth2", d).get("access_token", d.get("access_token"))
+    else:
+        token = raw
+    if not token: raise RuntimeError("No access_token in GARMIN_SESSION")
+    client = GarminClient(token)
     name = client.get_full_name()
     print(f"Garmin: connected as {name}")
     return client
-
 
 def get_garmin_stats(client, date_str):
     """Pull comprehensive stats for a single date."""
