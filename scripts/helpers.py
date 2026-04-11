@@ -15,48 +15,137 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 
-# -- Garmin (raw HTTP with Bearer token) --
+# ── Timezone helper ──────────────────────────────────────────────
+def copenhagen_now():
+    """Return current datetime in Copenhagen (UTC+1 / UTC+2 DST)."""
+    import subprocess
+    result = subprocess.run(
+        ["date", "+%Y-%m-%d %H:%M:%S %A %B %-d %Y %z"],
+        capture_output=True, text=True,
+        env={**os.environ, "TZ": "Europe/Copenhagen"}
+    )
+    parts = result.stdout.strip().split(" ", 2)
+    date_str = parts[0]  # 2026-04-10
+    return {
+        "date": date_str,
+        "full_output": result.stdout.strip(),
+        "day_of_week": result.stdout.strip().split()[2],  # e.g. "Friday"
+    }
+
+
+def today_str():
+    return copenhagen_now()["date"]
+
+
+# ── Garmin (raw HTTP with Bearer token — no garth dependency) ────
 class GarminClient:
+    """Direct Garmin Connect API using raw HTTP requests with OAuth2 Bearer token.
+
+    This bypasses garth entirely to avoid 429 errors on the token refresh
+    endpoint from cloud IPs (GitHub Actions). The access token is passed in
+    directly and used as-is — no automatic refresh attempts.
+    """
+
     BASE = "https://connect.garmin.com"
+
     def __init__(self, access_token):
-        import requests as _r
-        self.session = _r.Session()
-        self.session.headers.update({"Authorization": f"Bearer {access_token}", "DI-Backend": "connectapi.garmin.com", "NK": "NT"})
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Authorization": f"Bearer {access_token}",
+            "DI-Backend": "connectapi.garmin.com",
+            "NK": "NT",
+        })
+
     def _get(self, path, **kwargs):
-        resp = self.session.get(f"{self.BASE}{path}", params=kwargs.get("params"))
+        """Make authenticated GET request."""
+        url = f"{self.BASE}{path}"
+        params = kwargs.get("params")
+        resp = self.session.get(url, params=params)
         resp.raise_for_status()
         return resp.json()
-    def get_stats(self, d): return self._get(f"/usersummary-service/stats/{d}")
-    def get_sleep_data(self, d): return self._get(f"/wellness-service/wellness/dailySleepData/{d}")
-    def get_heart_rates(self, d): return self._get(f"/wellness-service/wellness/dailyHeartRate/{d}")
-    def get_stress_data(self, d): return self._get(f"/wellness-service/wellness/dailyStress/{d}")
-    def get_body_battery(self, d): return self._get(f"/wellness-service/wellness/bodyBattery/dates/{d}/{d}")
-    def get_steps_data(self, d): return self._get(f"/wellness-service/wellness/dailySteps/{d}")
-    def get_hrv_data(self, d): return self._get(f"/hrv-service/hrv/{d}")
-    def get_activities_by_date(self, s, e): return self._get("/activitylist-service/activities/search/activities", params={"startDate": s, "endDate": e, "limit": 20})
-    def get_training_status(self, d): return self._get(f"/metrics-service/metrics/trainingstatus/aggregated/{d}")
-    def get_training_readiness(self, d): return self._get(f"/metrics-service/metrics/trainingreadiness/{d}")
-    def get_race_predictions(self): return self._get("/metrics-service/metrics/racepredictions")
-    def get_endurance_score(self, d): return self._get(f"/metrics-service/metrics/endurancescore/{d}")
+
+    def get_stats(self, date_str):
+        return self._get(f"/usersummary-service/stats/{date_str}")
+
+    def get_sleep_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailySleepData/{date_str}")
+
+    def get_heart_rates(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailyHeartRate/{date_str}")
+
+    def get_stress_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailyStress/{date_str}")
+
+    def get_body_battery(self, date_str):
+        return self._get(f"/wellness-service/wellness/bodyBattery/dates/{date_str}/{date_str}")
+
+    def get_steps_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailySteps/{date_str}")
+
+    def get_hrv_data(self, date_str):
+        return self._get(f"/hrv-service/hrv/{date_str}")
+
+    def get_activities_by_date(self, start_date, end_date):
+        return self._get(
+            f"/activitylist-service/activities/search/activities",
+            params={"startDate": start_date, "endDate": end_date, "limit": 20}
+        )
+
+    def get_training_status(self, date_str):
+        return self._get(f"/metrics-service/metrics/trainingstatus/aggregated/{date_str}")
+
+    def get_training_readiness(self, date_str):
+        return self._get(f"/metrics-service/metrics/trainingreadiness/{date_str}")
+
+    def get_race_predictions(self):
+        return self._get(f"/metrics-service/metrics/racepredictions")
+
+    def get_endurance_score(self, date_str):
+        return self._get(f"/metrics-service/metrics/endurancescore/{date_str}")
+
     def get_full_name(self):
         data = self._get("/userprofile-service/usersettings")
         return data.get("displayName", data.get("userName", "Unknown"))
 
+
 def get_garmin_client():
-    import json as _j
-    raw = os.environ.get("GARMIN_SESSION", "").strip()
-    if not raw: raise RuntimeError("GARMIN_SESSION not set")
-    token = None
-    if raw.startswith("{"):
-        d = _j.loads(raw)
-        token = d.get("oauth2", d).get("access_token", d.get("access_token"))
+    """Set up Garmin client with OAuth2 access token (no garth, no refresh).
+
+    Accepts GARMIN_SESSION as either:
+      - Full garth format: {"oauth1": {...}, "oauth2": {"access_token": "..."}}
+      - Simple format: {"access_token": "..."}
+      - Plain token string: "eyJ..."
+    """
+    session_raw = os.environ.get("GARMIN_SESSION", "").strip()
+
+    if not session_raw:
+        raise RuntimeError("GARMIN_SESSION secret not set.")
+
+    # Determine token format
+    access_token = None
+
+    if session_raw.startswith("{"):
+        # JSON format
+        session_data = json.loads(session_raw)
+        if "oauth2" in session_data:
+            access_token = session_data["oauth2"].get("access_token")
+        elif "access_token" in session_data:
+            access_token = session_data["access_token"]
     else:
-        token = raw
-    if not token: raise RuntimeError("No access_token in GARMIN_SESSION")
-    client = GarminClient(token)
+        # Plain token string
+        access_token = session_raw
+
+    if not access_token:
+        raise RuntimeError(
+            "Could not extract access_token from GARMIN_SESSION. "
+            "Expected JSON with 'oauth2.access_token', 'access_token', or a plain token string."
+        )
+
+    client = GarminClient(access_token)
     name = client.get_full_name()
     print(f"Garmin: connected as {name}")
     return client
+
 
 def get_garmin_stats(client, date_str):
     """Pull comprehensive stats for a single date."""
