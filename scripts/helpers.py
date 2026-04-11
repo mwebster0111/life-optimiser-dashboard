@@ -46,13 +46,12 @@ class GarminClient:
     directly and used as-is — no automatic refresh attempts.
     """
 
-    BASE = "https://connect.garmin.com"
+    BASE = "https://connectapi.garmin.com"
 
     def __init__(self, access_token):
         self.session = requests.Session()
         self.session.headers.update({
             "Authorization": f"Bearer {access_token}",
-            "DI-Backend": "connectapi.garmin.com",
             "NK": "NT",
         })
 
@@ -142,8 +141,11 @@ def get_garmin_client():
         )
 
     client = GarminClient(access_token)
-    name = client.get_full_name()
-    print(f"Garmin: connected as {name}")
+    try:
+        name = client.get_full_name()
+        print(f"Garmin: connected as {name}")
+    except Exception as e:
+        print(f"Garmin: connected (name lookup skipped: {e})")
     return client
 
 
