@@ -12,7 +12,6 @@ from email.mime.text import MIMEText
 
 import requests
 import garth
-from garminconnect import Garmin
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
@@ -39,17 +38,71 @@ def today_str():
     return copenhagen_now()["date"]
 
 
-# ── Garmin (using saved garth OAuth tokens) ──────────────────────
+# ── Garmin (direct API via garth tokens — bypasses broken garminconnect) ──
+class GarminClient:
+    """Direct Garmin Connect API using garth for OAuth token management."""
+
+    BASE = "https://connect.garmin.com"
+
+    def __init__(self):
+        pass
+
+    def _get(self, path, **kwargs):
+        """Make authenticated GET request via garth."""
+        url = f"{self.BASE}{path}"
+        resp = garth.client.connectapi(url, **kwargs)
+        return resp
+
+    def get_stats(self, date_str):
+        return self._get(f"/usersummary-service/stats/{date_str}")
+
+    def get_sleep_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailySleepData/{date_str}")
+
+    def get_heart_rates(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailyHeartRate/{date_str}")
+
+    def get_stress_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailyStress/{date_str}")
+
+    def get_body_battery(self, date_str):
+        return self._get(f"/wellness-service/wellness/bodyBattery/dates/{date_str}/{date_str}")
+
+    def get_steps_data(self, date_str):
+        return self._get(f"/wellness-service/wellness/dailySteps/{date_str}")
+
+    def get_hrv_data(self, date_str):
+        return self._get(f"/hrv-service/hrv/{date_str}")
+
+    def get_activities_by_date(self, start_date, end_date):
+        return self._get(
+            f"/activitylist-service/activities/search/activities",
+            params={"startDate": start_date, "endDate": end_date, "limit": 20}
+        )
+
+    def get_training_status(self, date_str):
+        return self._get(f"/metrics-service/metrics/trainingstatus/aggregated/{date_str}")
+
+    def get_training_readiness(self, date_str):
+        return self._get(f"/metrics-service/metrics/trainingreadiness/{date_str}")
+
+    def get_race_predictions(self):
+        return self._get(f"/metrics-service/metrics/racepredictions")
+
+    def get_endurance_score(self, date_str):
+        return self._get(f"/metrics-service/metrics/endurancescore/{date_str}")
+
+    def get_full_name(self):
+        data = self._get("/userprofile-service/usersettings")
+        return data.get("displayName", data.get("userName", "Unknown"))
+
+
 def get_garmin_client():
-    """Connect to Garmin using saved garth OAuth tokens from GARMIN_SESSION secret."""
+    """Set up garth with saved tokens and return a direct API client."""
     session_json = os.environ.get("GARMIN_SESSION", "")
 
     if not session_json:
-        raise RuntimeError(
-            "GARMIN_SESSION secret not set. Run: "
-            'echo \'{"oauth1":\'$(cat ~/.garth/oauth1_token.json)\',"oauth2":\'$(cat ~/.garth/oauth2_token.json)\'}\' '
-            "on your Mac to get the tokens."
-        )
+        raise RuntimeError("GARMIN_SESSION secret not set.")
 
     session_data = json.loads(session_json)
 
@@ -62,17 +115,12 @@ def get_garmin_client():
     with open(os.path.join(token_dir, "oauth2_token.json"), "w") as f:
         json.dump(session_data["oauth2"], f)
 
-    # Load tokens into garth and let it handle refresh
+    # Load tokens into garth — it handles refresh automatically
     garth.resume(token_dir)
 
-    # Create Garmin client with loaded garth session
-    email = os.environ.get("GARMIN_EMAIL", "user@example.com")
-    password = os.environ.get("GARMIN_PASSWORD", "placeholder")
-    client = Garmin(email, password)
-    client.garth = garth.client
-    client.login()
-
-    print(f"Garmin: connected via saved tokens")
+    client = GarminClient()
+    name = client.get_full_name()
+    print(f"Garmin: connected as {name}")
     return client
 
 
