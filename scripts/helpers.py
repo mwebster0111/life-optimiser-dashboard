@@ -63,7 +63,7 @@ def get_garmin_client():
         json.dump(session_data["oauth2"], f)
 
     # Load tokens into garth and let it handle refresh
-    garth.load(token_dir)
+    garth.resume(token_dir)
 
     # Create Garmin client with loaded garth session
     client = Garmin()
